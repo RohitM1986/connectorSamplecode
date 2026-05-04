@@ -1,0 +1,99 @@
+/// &lt;summary&gt;
+/// Data contract for API response
+/// &lt;/summary&gt;
+[DataContractAttribute]
+public class CRMAPIResponseContract
+{
+    private str status;
+    private str transactionId;
+    private str validationResult;
+    private utcdatetime timestamp;
+    private str errorMessage;
+    private int processedRecords;
+    private int failedRecords;
+    private List errors;
+
+    public void new()
+    {
+        super();
+        errors = new List(Types::String);
+    }
+
+    [DataMemberAttribute('Status')]
+    public str parmStatus(str _status = status)
+    {
+        status = _status;
+        return status;
+    }
+
+    [DataMemberAttribute('TransactionId')]
+    public str parmTransactionId(str _transactionId = transactionId)
+    {
+        transactionId = _transactionId;
+        return transactionId;
+    }
+
+    [DataMemberAttribute('ValidationResult')]
+    public str parmValidationResult(str _validationResult = validationResult)
+    {
+        validationResult = _validationResult;
+        return validationResult;
+    }
+
+    [DataMemberAttribute('Timestamp')]
+    public utcdatetime parmTimestamp(utcdatetime _timestamp = timestamp)
+    {
+        timestamp = _timestamp;
+        return timestamp;
+    }
+
+    [DataMemberAttribute('ErrorMessage')]
+    public str parmErrorMessage(str _errorMessage = errorMessage)
+    {
+        errorMessage = _errorMessage;
+        return errorMessage;
+    }
+
+    [DataMemberAttribute('ProcessedRecords')]
+    public int parmProcessedRecords(int _processedRecords = processedRecords)
+    {
+        processedRecords = _processedRecords;
+        return processedRecords;
+    }
+
+    [DataMemberAttribute('FailedRecords')]
+    public int parmFailedRecords(int _failedRecords = failedRecords)
+    {
+        failedRecords = _failedRecords;
+        return failedRecords;
+    }
+
+    [DataMemberAttribute('Errors')]
+    public List parmErrors(List _errors = errors)
+    {
+        errors = _errors;
+        return errors;
+    }
+
+    /// &lt;summary&gt;
+    /// Checks if the response is successful
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;True if successful&lt;/returns&gt;
+    public boolean isSuccess()
+    {
+        return status == 'success' || status == 'Success';
+    }
+
+    /// &lt;summary&gt;
+    /// Adds an error message to the response
+    /// &lt;/summary&gt;
+    /// &lt;param name="_error"&gt;Error message&lt;/param&gt;
+    public void addError(str _error)
+    {
+        if (errors == null)
+        {
+            errors = new List(Types::String);
+        }
+        errors.addEnd(_error);
+    }
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxMenuItemDisplay xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>CRMIntegrationLog</Name>
+  <Label>CRM Integration Log</Label>
+  <HelpText>View CRM Integration Execution History</HelpText>
+  <Object>CRMIntegrationLog</Object>
+  <ObjectType>Table</ObjectType>
+</AxMenuItemDisplay>

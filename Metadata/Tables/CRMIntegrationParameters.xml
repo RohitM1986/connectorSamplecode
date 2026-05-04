@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>CRMIntegrationParameters</Name>
+  <Label>CRM Integration Parameters</Label>
+  <TableGroup>Parameter</TableGroup>
+  <TitleField1>APIEndpoint</TitleField1>
+  <PrimaryIndex>RecIdIdx</PrimaryIndex>
+  <SaveDataPerCompany>Yes</SaveDataPerCompany>
+  <Fields>
+    <AxTableField>
+      <Name>RecId</Name>
+      <Type>Int64</Type>
+      <AllowEdit>No</AllowEdit>
+    </AxTableField>
+    <AxTableField>
+      <Name>Enabled</Name>
+      <ExtendedDataType>NoYes</ExtendedDataType>
+      <Label>Enabled</Label>
+      <HelpText>Enable or disable CRM integration</HelpText>
+    </AxTableField>
+    <AxTableField>
+      <Name>APIEndpoint</Name>
+      <ExtendedDataType>URL</ExtendedDataType>
+      <StringSize>255</StringSize>
+      <Label>API Endpoint</Label>
+      <HelpText>External API endpoint URL</HelpText>
+      <Mandatory>Yes</Mandatory>
+    </AxTableField>
+    <AxTableField>
+      <Name>APIKey</Name>
+      <ExtendedDataType>String255</ExtendedDataType>
+      <Label>API Key</Label>
+      <HelpText>API authentication key (stored encrypted)</HelpText>
+      <Visible>No</Visible>
+    </AxTableField>
+    <AxTableField>
+      <Name>DefaultCustGroup</Name>
+      <ExtendedDataType>CustGroupId</ExtendedDataType>
+      <Label>Default Customer Group</Label>
+      <HelpText>Default customer group for batch processing</HelpText>
+    </AxTableField>
+    <AxTableField>
+      <Name>BatchSize</Name>
+      <ExtendedDataType>Integer</ExtendedDataType>
+      <Label>Batch Size</Label>
+      <HelpText>Number of records to process per batch</HelpText>
+    </AxTableField>
+    <AxTableField>
+      <Name>TimeoutSeconds</Name>
+      <ExtendedDataType>Integer</ExtendedDataType>
+      <Label>Timeout (seconds)</Label>
+      <HelpText>API call timeout in seconds</HelpText>
+    </AxTableField>
+    <AxTableField>
+      <Name>MaxRetries</Name>
+      <ExtendedDataType>Integer</ExtendedDataType>
+      <Label>Max Retries</Label>
+      <HelpText>Maximum number of retry attempts</HelpText>
+    </AxTableField>
+    <AxTableField>
+      <Name>CreatedDateTime</Name>
+      <ExtendedDataType>CreatedDateTime</ExtendedDataType>
+      <AllowEdit>No</AllowEdit>
+    </AxTableField>
+    <AxTableField>
+      <Name>ModifiedDateTime</Name>
+      <ExtendedDataType>ModifiedDateTime</ExtendedDataType>
+      <AllowEdit>No</AllowEdit>
+    </AxTableField>
+    <AxTableField>
+      <Name>ModifiedBy</Name>
+      <ExtendedDataType>ModifiedBy</ExtendedDataType>
+      <AllowEdit>No</AllowEdit>
+    </AxTableField>
+  </Fields>
+  <Indexes>
+    <AxTableIndex>
+      <Name>RecIdIdx</Name>
+      <AlternateKey>No</AlternateKey>
+      <Fields>
+        <AxTableIndexField>
+          <DataField>RecId</DataField>
+        </AxTableIndexField>
+      </Fields>
+    </AxTableIndex>
+  </Indexes>
+</AxTable>

@@ -1,0 +1,84 @@
+/// &lt;summary&gt;
+/// Batch job class for scheduled CRM API integration
+/// &lt;/summary&gt;
+public class CRMIntegrationBatch extends RunBaseBatch
+{
+    private CRMExternalAPIIntegration integration;
+
+    /// &lt;summary&gt;
+    /// Constructor
+    /// &lt;/summary&gt;
+    public void new()
+    {
+        super();
+        integration = new CRMExternalAPIIntegration();
+    }
+
+    /// &lt;summary&gt;
+    /// Main execution method
+    /// &lt;/summary&gt;
+    public void run()
+    {
+        CRMIntegrationParameters parameters;
+
+        setPrefix("CRM Integration Batch");
+
+        try
+        {
+            // Load parameters from configuration
+            parameters = CRMIntegrationParameters::find();
+
+            if (!parameters.Enabled)
+            {
+                info("CRM Integration is disabled in parameters");
+                return;
+            }
+
+            // Configure integration
+            integration.parmCustGroup(parameters.DefaultCustGroup);
+            integration.parmBatchSize(parameters.BatchSize ? parameters.BatchSize : 100);
+
+            // Run integration
+            info("Starting scheduled CRM integration...");
+            integration.run();
+            info("Scheduled CRM integration completed");
+        }
+        catch (Exception::Error)
+        {
+            error("Scheduled CRM integration failed");
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Class description
+    /// &lt;/summary&gt;
+    static ClassDescription description()
+    {
+        return "CRM Integration Batch Job";
+    }
+
+    /// &lt;summary&gt;
+    /// Main entry point for batch
+    /// &lt;/summary&gt;
+    public static void main(Args _args)
+    {
+        CRMIntegrationBatch batch = new CRMIntegrationBatch();
+        batch.runOperation();
+    }
+
+    /// &lt;summary&gt;
+    /// Can run in new session
+    /// &lt;/summary&gt;
+    public boolean canRunInNewSession()
+    {
+        return true;
+    }
+
+    /// &lt;summary&gt;
+    /// Capability to run as batch
+    /// &lt;/summary&gt;
+    public boolean runsImpersonated()
+    {
+        return true;
+    }
+}

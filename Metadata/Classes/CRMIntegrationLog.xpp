@@ -1,0 +1,136 @@
+/// &lt;summary&gt;
+/// Table extension for CRM Integration Log
+/// Stores execution history and results
+/// &lt;/summary&gt;
+/// Note: In actual D365 F&O, this would be defined as a table in the AOT
+/// This is the X++ code that would go with the table
+public class CRMIntegrationLog extends common
+{
+    // Field definitions would be in the table metadata
+    // Key: RecId (Primary), RequestId (Alternate)
+
+    /// &lt;summary&gt;
+    /// Finds log by request ID
+    /// &lt;/summary&gt;
+    public static CRMIntegrationLog findByRequestId(str _requestId, boolean _forUpdate = false)
+    {
+        CRMIntegrationLog log;
+
+        if (_forUpdate)
+        {
+            log.selectForUpdate(_forUpdate);
+        }
+
+        select firstonly log
+            where log.RequestId == _requestId;
+
+        return log;
+    }
+
+    /// &lt;summary&gt;
+    /// Gets recent logs
+    /// &lt;/summary&gt;
+    public static List getRecentLogs(int _count = 100)
+    {
+        CRMIntegrationLog log;
+        List logList = new List(Types::Record);
+        int counter = 0;
+
+        while select log
+            order by RequestTimestamp desc
+        {
+            logList.addEnd(log);
+            counter++;
+            
+            if (counter >= _count)
+            {
+                break;
+            }
+        }
+
+        return logList;
+    }
+
+    /// &lt;summary&gt;
+    /// Gets failed logs for retry
+    /// &lt;/summary&gt;
+    public static List getFailedLogs(int _count = 50)
+    {
+        CRMIntegrationLog log;
+        List logList = new List(Types::Record);
+        int counter = 0;
+
+        while select log
+            where log.Success == NoYes::No
+            order by RequestTimestamp desc
+        {
+            logList.addEnd(log);
+            counter++;
+            
+            if (counter >= _count)
+            {
+                break;
+            }
+        }
+
+        return logList;
+    }
+
+    /// &lt;summary&gt;
+    /// Initializes log entry
+    /// &lt;/summary&gt;
+    public void initValue()
+    {
+        super();
+        
+        this.RequestTimestamp = DateTimeUtil::utcNow();
+        this.Success = NoYes::No;
+    }
+
+    /// &lt;summary&gt;
+    /// Calculates duration
+    /// &lt;/summary&gt;
+    public int getDuration()
+    {
+        if (this.ResponseTimestamp && this.RequestTimestamp)
+        {
+            return DateTimeUtil::getDifference(this.ResponseTimestamp, this.RequestTimestamp);
+        }
+        return 0;
+    }
+
+    /// &lt;summary&gt;
+    /// Gets success rate percentage
+    /// &lt;/summary&gt;
+    public Real getSuccessRate()
+    {
+        if (this.AccountCount > 0)
+        {
+            return (this.ProcessedRecords * 100.0) / this.AccountCount;
+        }
+        return 0.0;
+    }
+}
+
+// Table structure definition (would be in AOT metadata):
+/*
+Table: CRMIntegrationLog
+Fields:
+- RecId (Int64, PK)
+- RequestId (String 50, Unique)
+- RequestTimestamp (UtcDateTime)
+- ResponseTimestamp (UtcDateTime)
+- TransactionId (String 50)
+- AccountCount (Integer)
+- ProcessedRecords (Integer)
+- FailedRecords (Integer)
+- Status (String 20)
+- Success (NoYes)
+- ErrorMessage (String 1000)
+- CreatedDateTime (UtcDateTime)
+- CreatedBy (UserId)
+
+Indexes:
+- RequestIdIdx (RequestId - unique)
+- RequestTimestampIdx (RequestTimestamp)
+*/

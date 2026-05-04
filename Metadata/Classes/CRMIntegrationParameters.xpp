@@ -1,0 +1,213 @@
+/// &lt;summary&gt;
+/// Table extension for CRM Integration Parameters
+/// Stores configuration settings for the integration
+/// &lt;/summary&gt;
+/// Note: In actual D365 F&O, this would be defined as a table in the AOT
+/// This is the X++ code that would go with the table
+public class CRMIntegrationParameters extends common
+{
+    // Field definitions would be in the table metadata
+    // Key: RecId (Primary)
+    // Fields: see below
+
+    /// &lt;summary&gt;
+    /// Finds the parameters record (singleton pattern)
+    /// &lt;/summary&gt;
+    public static CRMIntegrationParameters find(boolean _forUpdate = false)
+    {
+        CRMIntegrationParameters parameters;
+
+        if (_forUpdate)
+        {
+            parameters.selectForUpdate(_forUpdate);
+        }
+
+        select firstonly parameters;
+
+        if (!parameters)
+        {
+            // Create default parameters if not exists
+            ttsbegin;
+            parameters.clear();
+            parameters.initTable();
+            parameters.insert();
+            ttscommit;
+        }
+
+        return parameters;
+    }
+
+    /// &lt;summary&gt;
+    /// Initializes default values
+    /// &lt;/summary&gt;
+    public void initTable()
+    {
+        super();
+        
+        this.Enabled = NoYes::No;
+        this.BatchSize = 100;
+        this.TimeoutSeconds = 30;
+        this.MaxRetries = 3;
+        this.AuthType = 'Bearer';
+        this.HTTPMethod = 'POST';
+        this.ContentType = 'application/json';
+        // Set to Yes when the Agentic AI Solution handles sync.
+        // This disables the CRMCustomerNameChangeHandler data event watcher.
+        this.AgenticSyncEnabled = NoYes::No;
+    }
+
+    /// &lt;summary&gt;
+    /// Gets the decrypted API key
+    /// &lt;/summary&gt;
+    public str getAPIKey()
+    {
+        // In production, implement proper encryption/decryption
+        // For now, return the stored value
+        return this.APIKey;
+    }
+
+    /// &lt;summary&gt;
+    /// Sets the encrypted API key
+    /// &lt;/summary&gt;
+    public void setAPIKey(str _apiKey)
+    {
+        // In production, implement proper encryption
+        // For now, store the value directly
+        this.APIKey = _apiKey;
+    }
+
+    /// &lt;summary&gt;
+    /// Gets the decrypted Bearer token
+    /// &lt;/summary&gt;
+    public str getBearerToken()
+    {
+        // In production, implement proper encryption/decryption
+        // For now, return the stored value
+        return this.BearerToken;
+    }
+
+    /// &lt;summary&gt;
+    /// Sets the encrypted Bearer token
+    /// &lt;/summary&gt;
+    public void setBearerToken(str _bearerToken)
+    {
+        // In production, implement proper encryption
+        // For now, store the value directly
+        this.BearerToken = _bearerToken;
+    }
+
+    /// &lt;summary&gt;
+    /// Gets the decrypted Basic Auth password
+    /// &lt;/summary&gt;
+    public str getBasicAuthPassword()
+    {
+        // In production, implement proper encryption/decryption
+        // For now, return the stored value
+        return this.BasicAuthPassword;
+    }
+
+    /// &lt;summary&gt;
+    /// Sets the encrypted Basic Auth password
+    /// &lt;/summary&gt;
+    public void setBasicAuthPassword(str _password)
+    {
+        // In production, implement proper encryption
+        // For now, store the value directly
+        this.BasicAuthPassword = _password;
+    }
+
+    /// &lt;summary&gt;
+    /// Validates the parameters
+    /// &lt;/summary&gt;
+    public boolean validateWrite()
+    {
+        boolean ret = super();
+
+        if (this.Enabled)
+        {
+            if (!this.APIEndpoint)
+            {
+                ret = checkFailed("API Endpoint is required when integration is enabled");
+            }
+
+            // Validate authentication based on auth type
+            switch (this.AuthType)
+            {
+                case 'ApiKey':
+                    if (!this.APIKey)
+                    {
+                        warning("API Key is not set. Authentication may fail.");
+                    }
+                    break;
+                    
+                case 'Bearer':
+                    if (!this.BearerToken)
+                    {
+                        warning("Bearer Token is not set. Authentication may fail.");
+                    }
+                    break;
+                    
+                case 'Basic':
+                    if (!this.BasicAuthUsername || !this.BasicAuthPassword)
+                    {
+                        warning("Basic auth credentials are not complete. Authentication may fail.");
+                    }
+                    break;
+            }
+
+            if (this.BatchSize <= 0)
+            {
+                ret = checkFailed("Batch Size must be greater than 0");
+            }
+
+            if (this.TimeoutSeconds <= 0)
+            {
+                ret = checkFailed("Timeout must be greater than 0");
+            }
+            
+            // Validate HTTP method
+            if (this.HTTPMethod && 
+                this.HTTPMethod != 'GET' && 
+                this.HTTPMethod != 'POST' && 
+                this.HTTPMethod != 'PUT' && 
+                this.HTTPMethod != 'DELETE' && 
+                this.HTTPMethod != 'PATCH')
+            {
+                ret = checkFailed("Invalid HTTP method. Must be GET, POST, PUT, DELETE, or PATCH");
+            }
+        }
+
+        return ret;
+    }
+
+    /// &lt;summary&gt;
+    /// Returns the singleton key value
+    /// &lt;/summary&gt;
+    public RecId getSingletonKey()
+    {
+        return 0;
+    }
+}
+
+// Table structure definition (would be in AOT metadata):
+/*
+Table: CRMIntegrationParameters
+Fields:
+- RecId (Int64, PK)
+- Enabled (NoYes) - Enable/disable integration
+- APIEndpoint (String 255) - External API URL
+- AuthType (String 20) - Authentication type: 'ApiKey', 'Bearer', 'Basic', 'None'
+- APIKey (String 255) - API authentication key (encrypted) - for ApiKey auth
+- BearerToken (String 500) - Bearer token (encrypted) - for Bearer auth
+- BasicAuthUsername (String 100) - Username for Basic auth
+- BasicAuthPassword (String 255) - Password for Basic auth (encrypted)
+- HTTPMethod (String 10) - HTTP method: GET, POST, PUT, DELETE, PATCH
+- ContentType (String 100) - Content type: application/json, application/xml, etc.
+- DefaultCustGroup (CustGroupId) - Default customer group filter
+- BatchSize (Integer) - Number of records per batch
+- TimeoutSeconds (Integer) - API timeout in seconds
+- MaxRetries (Integer) - Number of retry attempts
+- CreatedDateTime (UtcDateTime)
+- ModifiedDateTime (UtcDateTime)
+- ModifiedBy (UserId)
+*/

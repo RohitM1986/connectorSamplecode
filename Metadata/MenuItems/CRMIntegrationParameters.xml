@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxMenuItemDisplay xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>CRMIntegrationParameters</Name>
+  <Label>CRM Integration Parameters</Label>
+  <HelpText>Configure CRM Integration Settings</HelpText>
+  <Object>CRMIntegrationParameters</Object>
+  <ObjectType>Table</ObjectType>
+</AxMenuItemDisplay>

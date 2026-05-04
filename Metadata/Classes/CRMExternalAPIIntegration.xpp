@@ -1,0 +1,313 @@
+/// &lt;summary&gt;
+/// Main orchestration class for CRM external API integration
+/// Coordinates data extraction and API communication
+/// &lt;/summary&gt;
+public class CRMExternalAPIIntegration extends RunBaseBatch
+{
+    private const int DefaultBatchSize = 100;
+
+    private CRMAccountDataService dataService;
+    private CRMExternalAPIService apiService;
+    private CustGroupId custGroup;
+    private TransDate fromDate;
+    private TransDate toDate;
+    private int batchSize;
+    
+    private int totalProcessed;
+    private int totalFailed;
+    private DialogField dlgCustGroup;
+    private DialogField dlgFromDate;
+    private DialogField dlgToDate;
+    private DialogField dlgBatchSize;
+
+    #define.CurrentVersion(1)
+    #localmacro.CurrentList
+        custGroup,
+        fromDate,
+        toDate,
+        batchSize
+    #endmacro
+
+    /// &lt;summary&gt;
+    /// Constructor
+    /// &lt;/summary&gt;
+    public void new()
+    {
+        super();
+        dataService = new CRMAccountDataService();
+        apiService = new CRMExternalAPIService();
+        batchSize = DefaultBatchSize;
+        totalProcessed = 0;
+        totalFailed = 0;
+    }
+
+    /// &lt;summary&gt;
+    /// Main execution method
+    /// &lt;/summary&gt;
+    public void run()
+    {
+        List accountList;
+        CRMAPIRequestContract request;
+        CRMAPIResponseContract response;
+
+        try
+        {
+            setPrefix("CRM API Integration");
+
+            info(strFmt("Starting integration process..."));
+            info(strFmt("Customer Group: %1", custGroup ? custGroup : "All"));
+            info(strFmt("Date Range: %1 to %2", 
+                fromDate ? date2Str(fromDate, 123, 2, -1, 2, -1, 4) : "All",
+                toDate ? date2Str(toDate, 123, 2, -1, 2, -1, 4) : "All"));
+
+            // Get account data
+            accountList = dataService.getAccounts(fromDate, toDate, custGroup);
+            
+            if (accountList.elements() == 0)
+            {
+                warning("No accounts found matching the criteria");
+                return;
+            }
+
+            info(strFmt("Found %1 accounts to process", accountList.elements()));
+
+            // Process in batches
+            this.processAccountBatches(accountList);
+
+            // Summary
+            info(strFmt("Integration completed. Total processed: %1, Failed: %2", 
+                totalProcessed, totalFailed));
+        }
+        catch (Exception::Error)
+        {
+            error("Integration process failed");
+            throw;
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Processes accounts in batches
+    /// &lt;/summary&gt;
+    /// &lt;param name="_accountList"&gt;List of accounts to process&lt;/param&gt;
+    private void processAccountBatches(List _accountList)
+    {
+        ListIterator iterator = new ListIterator(_accountList);
+        List batchList = new List(Types::Class);
+        int effectiveBatchSize;
+        int batchNumber = 1;
+
+        // Keep integration calls batched and avoid per-record API calls.
+        effectiveBatchSize = batchSize >= DefaultBatchSize ? batchSize : DefaultBatchSize;
+
+        while (iterator.more())
+        {
+            batchList.addEnd(iterator.value());
+            iterator.next();
+
+            // Process batch when size reached or this is the final remainder.
+            if (batchList.elements() >= effectiveBatchSize || !iterator.more())
+            {
+                info(strFmt("Processing batch %1 with %2 accounts...", batchNumber, batchList.elements()));
+                this.processBatch(batchList, batchNumber);
+                
+                // Reset for next batch
+                batchList = new List(Types::Class);
+                batchNumber++;
+            }
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Processes a single batch of accounts
+    /// &lt;/summary&gt;
+    /// &lt;param name="_batchList"&gt;Batch of accounts&lt;/param&gt;
+    /// &lt;param name="_batchNumber"&gt;Batch number&lt;/param&gt;
+    private void processBatch(List _batchList, int _batchNumber)
+    {
+        CRMAPIRequestContract request = new CRMAPIRequestContract();
+        CRMAPIResponseContract response;
+        ListIterator iterator = new ListIterator(_batchList);
+
+        // Build request
+        request.parmRequestType('AccountSync');
+        
+        while (iterator.more())
+        {
+            CRMAccountDataContract account = iterator.value();
+            request.addAccount(account);
+            iterator.next();
+        }
+
+        try
+        {
+            // Send to API using generic method
+            // Default: Uses configuration from CRMIntegrationParameters
+            response = apiService.sendData(request);
+            
+            // Alternative: Override endpoint and method for specific calls
+            // response = apiService.sendData(request, 'https://custom-api.com/endpoint', 'PUT');
+            
+            // Alternative: Add custom headers before sending
+            // apiService.addCustomHeader('X-Custom-Header', 'CustomValue');
+            // apiService.addCustomHeader('X-Correlation-Id', guid2Str(newGuid()));
+            // response = apiService.sendData(request);
+
+            // Process response
+            if (response.isSuccess())
+            {
+                totalProcessed += response.parmProcessedRecords();
+                totalFailed += response.parmFailedRecords();
+                
+                info(strFmt("Batch %1 completed successfully. Transaction ID: %2", 
+                    _batchNumber, response.parmTransactionId()));
+            }
+            else
+            {
+                totalFailed += _batchList.elements();
+                error(strFmt("Batch %1 failed: %2", _batchNumber, response.parmErrorMessage()));
+            }
+        }
+        catch (Exception::Error)
+        {
+            totalFailed += _batchList.elements();
+            error(strFmt("Failed to process batch %1", _batchNumber));
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Dialog configuration
+    /// &lt;/summary&gt;
+    public Object dialog()
+    {
+        DialogRunbase dialog = super();
+
+        dlgCustGroup = dialog.addFieldValue(extendedTypeStr(CustGroupId), custGroup, "Customer Group");
+        dlgFromDate = dialog.addFieldValue(extendedTypeStr(TransDate), fromDate, "From Date");
+        dlgToDate = dialog.addFieldValue(extendedTypeStr(TransDate), toDate, "To Date");
+        dlgBatchSize = dialog.addFieldValue(extendedTypeStr(Integer), batchSize, "Batch Size");
+
+        return dialog;
+    }
+
+    /// &lt;summary&gt;
+    /// Get values from dialog
+    /// &lt;/summary&gt;
+    public boolean getFromDialog()
+    {
+        custGroup = dlgCustGroup.value();
+        fromDate = dlgFromDate.value();
+        toDate = dlgToDate.value();
+        batchSize = dlgBatchSize.value();
+
+        return super();
+    }
+
+    /// &lt;summary&gt;
+    /// Validate batch size
+    /// &lt;/summary&gt;
+    public boolean validate(Object _calledFrom = null)
+    {
+        boolean ret = super(_calledFrom);
+
+        if (batchSize <= 0)
+        {
+            ret = checkFailed("Batch size must be greater than 0");
+        }
+
+        if (fromDate && toDate && fromDate > toDate)
+        {
+            ret = checkFailed("From Date must be before To Date");
+        }
+
+        return ret;
+    }
+
+    /// &lt;summary&gt;
+    /// Pack state
+    /// &lt;/summary&gt;
+    public container pack()
+    {
+        return [#CurrentVersion, #CurrentList];
+    }
+
+    /// &lt;summary&gt;
+    /// Unpack state
+    /// &lt;/summary&gt;
+    public boolean unpack(container _packedClass)
+    {
+        Version version = RunBase::getVersion(_packedClass);
+        
+        switch (version)
+        {
+            case #CurrentVersion:
+                [version, #CurrentList] = _packedClass;
+                break;
+            default:
+                return false;
+        }
+
+        return true;
+    }
+
+    /// &lt;summary&gt;
+    /// Class description
+    /// &lt;/summary&gt;
+    static ClassDescription description()
+    {
+        return "CRM External API Integration";
+    }
+
+    /// &lt;summary&gt;
+    /// Main entry point
+    /// &lt;/summary&gt;
+    public static void main(Args _args)
+    {
+        CRMExternalAPIIntegration integration = new CRMExternalAPIIntegration();
+
+        if (integration.prompt())
+        {
+            integration.runOperation();
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Can run in new session
+    /// &lt;/summary&gt;
+    public boolean canRunInNewSession()
+    {
+        return true;
+    }
+
+    /// &lt;summary&gt;
+    /// Capability to run as batch
+    /// &lt;/summary&gt;
+    public boolean runsImpersonated()
+    {
+        return true;
+    }
+
+    // Parm methods
+    public CustGroupId parmCustGroup(CustGroupId _custGroup = custGroup)
+    {
+        custGroup = _custGroup;
+        return custGroup;
+    }
+
+    public TransDate parmFromDate(TransDate _fromDate = fromDate)
+    {
+        fromDate = _fromDate;
+        return fromDate;
+    }
+
+    public TransDate parmToDate(TransDate _toDate = toDate)
+    {
+        toDate = _toDate;
+        return toDate;
+    }
+
+    public int parmBatchSize(int _batchSize = batchSize)
+    {
+        batchSize = _batchSize;
+        return batchSize;
+    }
+}

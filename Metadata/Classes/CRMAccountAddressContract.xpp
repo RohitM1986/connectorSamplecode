@@ -1,0 +1,47 @@
+/// &lt;summary&gt;
+/// Data contract for customer account address information
+/// &lt;/summary&gt;
+[DataContractAttribute]
+public class CRMAccountAddressContract
+{
+    private str street;
+    private str city;
+    private str state;
+    private str zipCode;
+    private str countryRegionId;
+
+    [DataMemberAttribute('Street')]
+    public str parmStreet(str _street = street)
+    {
+        street = _street;
+        return street;
+    }
+
+    [DataMemberAttribute('City')]
+    public str parmCity(str _city = city)
+    {
+        city = _city;
+        return city;
+    }
+
+    [DataMemberAttribute('State')]
+    public str parmState(str _state = state)
+    {
+        state = _state;
+        return state;
+    }
+
+    [DataMemberAttribute('ZipCode')]
+    public str parmZipCode(str _zipCode = zipCode)
+    {
+        zipCode = _zipCode;
+        return zipCode;
+    }
+
+    [DataMemberAttribute('Country')]
+    public str parmCountryRegionId(str _countryRegionId = countryRegionId)
+    {
+        countryRegionId = _countryRegionId;
+        return countryRegionId;
+    }
+}

@@ -1,44 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="Current">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <RootNamespace>CRMFOpoC</RootNamespace>
-    <AssemblyName>CRMFOpoC</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <ProjectType>Dynamics</ProjectType>
+    <Name>CRMFOpoC</Name>
+    <Description>CRM Integration Model for Finance &amp; Operations</Description>
     <Company>VTX</Company>
-    <Product>CRM F&amp;O PoC Package</Product>
-    <Description>Dynamics 365 Finance &amp; Operations CRM Integration Model</Description>
     <Version>1.0.0.0</Version>
-    <ModelName>CRMFOpoC</ModelName>
-    <ModelPublisher>VTX</ModelPublisher>
-    <ModelLayer>ISV</ModelLayer>
+    <Publisher>VTX</Publisher>
+    <Layer>ISV</Layer>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <ReferencedAssemblies>
+      <ReferencedAssembly Name="ApplicationFoundation" />
+      <ReferencedAssembly Name="ApplicationPlatform" />
+      <ReferencedAssembly Name="ApplicationSuite" />
+    </ReferencedAssemblies>
   </PropertyGroup>
-  
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  
+
   <ItemGroup>
-    <!-- X++ Classes -->
     <Compile Include="Metadata\Classes\CRMAccountAddressContract.xpp" />
     <Compile Include="Metadata\Classes\CRMAccountDataContract.xpp" />
     <Compile Include="Metadata\Classes\CRMAccountDataService.xpp" />
@@ -50,26 +29,17 @@
     <Compile Include="Metadata\Classes\CRMIntegrationBatch.xpp" />
     <Compile Include="Metadata\Classes\CRMIntegrationLog.xpp" />
     <Compile Include="Metadata\Classes\CRMIntegrationParameters.xpp" />
-    
-    <!-- Tables -->
     <Compile Include="Metadata\Tables\CRMIntegrationLog.xml" />
     <Compile Include="Metadata\Tables\CRMIntegrationParameters.xml" />
-    
-    <!-- Menu Items -->
     <Compile Include="Metadata\MenuItems\CRMExternalAPIIntegration.xml" />
     <Compile Include="Metadata\MenuItems\CRMIntegrationLog.xml" />
     <Compile Include="Metadata\MenuItems\CRMIntegrationParameters.xml" />
   </ItemGroup>
-  
+
   <ItemGroup>
-    <!-- Project Files -->
-    <None Include="Descriptor\CRMFOpoC.xml" />
-    <None Include="README.md" />
-    <None Include="INSTALLATION.md" />
-    <None Include="DEVELOPER_GUIDE.md" />
-    <None Include="azure-pipelines.yml" />
+    <ProjectConfiguration Include="Debug|AnyCPU" />
+    <ProjectConfiguration Include="Release|AnyCPU" />
   </ItemGroup>
-  
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="$(DynamicsVersionPath)\VisualStudio\Microsoft.Dynamics.Framework.Tools.Extensibility.targets" Condition="Exists('$(DynamicsVersionPath)\VisualStudio\Microsoft.Dynamics.Framework.Tools.Extensibility.targets')" />
+
+  <Import Project="$(VSToolsPath)\Dynamics\Microsoft.Dynamics.Framework.Tools.Project.Extensibility.Targets" Condition="Exists('$(VSToolsPath)\Dynamics\Microsoft.Dynamics.Framework.Tools.Project.Extensibility.Targets')" />
 </Project>

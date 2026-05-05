@@ -1,0 +1,613 @@
+/// &lt;summary&gt;
+/// Generic service class for third-party API communication
+/// Supports multiple HTTP methods, authentication types, and flexible request/response handling
+/// &lt;/summary&gt;
+public class CRMExternalAPIService
+{
+    private str apiEndpoint;
+    private str apiKey;
+    private str bearerToken;
+    private str basicAuthUsername;
+    private str basicAuthPassword;
+    private str authType;  // 'ApiKey', 'Bearer', 'Basic', 'None'
+    private str httpMethod; // 'GET', 'POST', 'PUT', 'DELETE', 'PATCH'
+    private str contentType;
+    private int timeoutSeconds;
+    private int maxRetries;
+    private Map customHeaders; // Additional headers as key-value pairs
+    
+    private const str ContentTypeJson = 'application/json';
+    private const str ContentTypeXml = 'application/xml';
+    private const str ContentTypeFormUrlEncoded = 'application/x-www-form-urlencoded';
+    private const str AuthHeaderName = 'Authorization';
+    private const str ApiKeyHeaderName = 'X-API-Key';
+    private const str DefaultHttpMethod = 'POST';
+    private const str AuthTypeNone = 'None';
+    private const str AuthTypeBearer = 'Bearer';
+
+    public void new()
+    {
+        // Initialize with default parameters
+        this.loadConfiguration();
+        this.customHeaders = new Map(Types::String, Types::String);
+
+        if (!this.httpMethod)
+        {
+            this.httpMethod = DefaultHttpMethod;
+        }
+
+        if (!this.contentType)
+        {
+            this.contentType = ContentTypeJson;
+        }
+
+        if (!this.authType)
+        {
+            this.authType = AuthTypeBearer;
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Loads API configuration from parameters
+    /// &lt;/summary&gt;
+    private void loadConfiguration()
+    {
+        CRMIntegrationParameters parameters = CRMIntegrationParameters::find();
+        
+        this.apiEndpoint = parameters.APIEndpoint;
+        this.apiKey = parameters.getAPIKey(); // Encrypted storage
+        this.authType = parameters.AuthType ? parameters.AuthType : AuthTypeBearer;
+        this.bearerToken = parameters.getBearerToken();
+        this.basicAuthUsername = parameters.BasicAuthUsername;
+        this.basicAuthPassword = parameters.getBasicAuthPassword();
+        this.httpMethod = parameters.HTTPMethod ? parameters.HTTPMethod : DefaultHttpMethod;
+        this.contentType = parameters.ContentType ? parameters.ContentType : ContentTypeJson;
+        this.timeoutSeconds = parameters.TimeoutSeconds ? parameters.TimeoutSeconds : 30;
+        this.maxRetries = parameters.MaxRetries ? parameters.MaxRetries : 3;
+    }
+
+    /// &lt;summary&gt;
+    /// Sends account data to external API (legacy method for backward compatibility)
+    /// &lt;/summary&gt;
+    /// &lt;param name="_request"&gt;API request contract&lt;/param&gt;
+    /// &lt;returns&gt;API response contract&lt;/returns&gt;
+    public CRMAPIResponseContract sendAccountData(CRMAPIRequestContract _request)
+    {
+        return this.sendData(_request);
+    }
+
+    /// &lt;summary&gt;
+    /// Generic method to send data to any third-party API
+    /// &lt;/summary&gt;
+    /// &lt;param name="_request"&gt;API request contract&lt;/param&gt;
+    /// &lt;param name="_customEndpoint"&gt;Optional custom endpoint to override default&lt;/param&gt;
+    /// &lt;param name="_customMethod"&gt;Optional HTTP method override&lt;/param&gt;
+    /// &lt;returns&gt;API response contract&lt;/returns&gt;
+    public CRMAPIResponseContract sendData(CRMAPIRequestContract _request, 
+                                           str _customEndpoint = '', 
+                                           str _customMethod = '')
+    {
+        CRMAPIResponseContract response;
+        int retryCount = 0;
+        boolean success = false;
+        str originalEndpoint = this.apiEndpoint;
+        str originalMethod = this.httpMethod;
+
+        try
+        {
+            // Apply custom overrides if provided
+            if (_customEndpoint)
+            {
+                this.apiEndpoint = _customEndpoint;
+            }
+            if (_customMethod)
+            {
+                this.httpMethod = _customMethod;
+            }
+
+            // Validate request
+            if (!this.validateRequest(_request))
+            {
+                throw error("Invalid API request");
+            }
+
+            // Retry logic
+            while (!success && retryCount < this.maxRetries)
+            {
+                try
+                {
+                    response = this.executeAPICall(_request);
+                    success = true;
+                }
+                catch (Exception::Error)
+                {
+                    retryCount++;
+                    if (retryCount >= this.maxRetries)
+                    {
+                        throw;
+                    }
+                    // Wait before retry (exponential backoff)
+                    sleep(retryCount * 1000);
+                }
+            }
+        }
+        finally
+        {
+            // Restore original values
+            this.apiEndpoint = originalEndpoint;
+            this.httpMethod = originalMethod;
+        }
+
+        return response;
+    }
+
+    /// &lt;summary&gt;
+    /// Executes the actual API call
+    /// &lt;/summary&gt;
+    /// &lt;param name="_request"&gt;API request contract&lt;/param&gt;
+    /// &lt;returns&gt;API response contract&lt;/returns&gt;
+    private CRMAPIResponseContract executeAPICall(CRMAPIRequestContract _request)
+    {
+        System.Net.HttpWebRequest httpRequest;
+        System.Net.HttpWebResponse httpResponse;
+        System.IO.Stream requestStream;
+        System.IO.StreamWriter streamWriter;
+        System.IO.StreamReader streamReader;
+        str requestBody;
+        str responseBody;
+        CRMAPIResponseContract response;
+
+        try
+        {
+            // Prepare request
+            httpRequest = System.Net.WebRequest::CreateHttp(this.apiEndpoint);
+            httpRequest.Method = this.httpMethod;
+            httpRequest.ContentType = this.contentType;
+            httpRequest.Timeout = this.timeoutSeconds * 1000;
+
+            // Add authentication headers based on auth type
+            this.addAuthenticationHeaders(httpRequest);
+            
+            // Add custom headers
+            this.addCustomHeaders(httpRequest);
+
+            // Serialize request to JSON
+            requestBody = this.serializeRequest(_request);
+
+            // Write request body (only for methods that support body)
+            if (this.httpMethod != 'GET' && this.httpMethod != 'DELETE')
+            {
+                requestStream = httpRequest.GetRequestStream();
+                streamWriter = new System.IO.StreamWriter(requestStream);
+                streamWriter.Write(requestBody);
+                streamWriter.Flush();
+                streamWriter.Close();
+            }
+
+            // Get response
+            httpResponse = httpRequest.GetResponse();
+            streamReader = new System.IO.StreamReader(httpResponse.GetResponseStream());
+            responseBody = streamReader.ReadToEnd();
+            streamReader.Close();
+
+            if (this.isAuthenticationPage(responseBody))
+            {
+                throw error(strFmt("Endpoint '%1' redirected to sign-in page. Configure AuthType as Bearer/ApiKey/Basic with valid credentials, or use an anonymous endpoint.", this.apiEndpoint));
+            }
+
+            // Deserialize response
+            response = this.deserializeResponse(responseBody);
+
+            // Log success
+            this.logAPICall(_request, response, true);
+
+            return response;
+        }
+        catch (Exception::CLRError)
+        {
+            // Handle CLR exceptions
+            response = new CRMAPIResponseContract();
+            response.parmStatus('error');
+            response.parmErrorMessage(ClrInterop::getLastException().ToString());
+            
+            // Log failure
+            this.logAPICall(_request, response, false);
+            
+            throw error(strFmt("API call failed: %1", response.parmErrorMessage()));
+        }
+        finally
+        {
+            if (streamWriter)
+            {
+                streamWriter.Dispose();
+            }
+            if (streamReader)
+            {
+                streamReader.Dispose();
+            }
+            if (httpResponse)
+            {
+                httpResponse.Close();
+            }
+        }
+
+        return response;
+    }
+
+    /// &lt;summary&gt;
+    /// Serializes request contract to JSON
+    /// &lt;/summary&gt;
+    /// &lt;param name="_request"&gt;Request contract&lt;/param&gt;
+    /// &lt;returns&gt;JSON string&lt;/returns&gt;
+    private str serializeRequest(CRMAPIRequestContract _request)
+    {
+        System.IO.MemoryStream memoryStream;
+        System.Runtime.Serialization.Json.DataContractJsonSerializer jsonSerializer;
+        System.IO.StreamReader streamReader;
+        str jsonString;
+
+        try
+        {
+            memoryStream = new System.IO.MemoryStream();
+            jsonSerializer = new System.Runtime.Serialization.Json.DataContractJsonSerializer(
+                _request.GetType()
+            );
+
+            jsonSerializer.WriteObject(memoryStream, _request);
+            memoryStream.Position = 0;
+
+            streamReader = new System.IO.StreamReader(memoryStream);
+            jsonString = streamReader.ReadToEnd();
+            streamReader.Close();
+
+            return jsonString;
+        }
+        finally
+        {
+            if (streamReader)
+            {
+                streamReader.Dispose();
+            }
+            if (memoryStream)
+            {
+                memoryStream.Dispose();
+            }
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Deserializes JSON response to contract
+    /// &lt;/summary&gt;
+    /// &lt;param name="_jsonString"&gt;JSON response string&lt;/param&gt;
+    /// &lt;returns&gt;Response contract&lt;/returns&gt;
+    private CRMAPIResponseContract deserializeResponse(str _jsonString)
+    {
+        System.IO.MemoryStream memoryStream;
+        System.Runtime.Serialization.Json.DataContractJsonSerializer jsonSerializer;
+        System.Text.Encoding encoding;
+        CRMAPIResponseContract response;
+
+        try
+        {
+            encoding = System.Text.Encoding::UTF8;
+            memoryStream = new System.IO.MemoryStream(
+                encoding.GetBytes(_jsonString)
+            );
+
+            jsonSerializer = new System.Runtime.Serialization.Json.DataContractJsonSerializer(
+                typeof(CRMAPIResponseContract)
+            );
+
+            response = jsonSerializer.ReadObject(memoryStream);
+            memoryStream.Close();
+
+            return response;
+        }
+        finally
+        {
+            if (memoryStream)
+            {
+                memoryStream.Dispose();
+            }
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Validates the API request before sending
+    /// &lt;/summary&gt;
+    /// &lt;param name="_request"&gt;Request contract&lt;/param&gt;
+    /// &lt;returns&gt;True if valid&lt;/returns&gt;
+    private boolean validateRequest(CRMAPIRequestContract _request)
+    {
+        if (!_request)
+        {
+            error("Request contract is null");
+            return false;
+        }
+
+        if (!this.apiEndpoint)
+        {
+            error("API endpoint is not configured");
+            return false;
+        }
+
+        if (_request.getAccountCount() == 0)
+        {
+            warning("Request contains no account data");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// &lt;summary&gt;
+    /// Logs API call details
+    /// &lt;/summary&gt;
+    /// &lt;param name="_request"&gt;Request contract&lt;/param&gt;
+    /// &lt;param name="_response"&gt;Response contract&lt;/param&gt;
+    /// &lt;param name="_success"&gt;Success flag&lt;/param&gt;
+    private void logAPICall(CRMAPIRequestContract _request, 
+                           CRMAPIResponseContract _response, 
+                           boolean _success)
+    {
+        CRMIntegrationLog log;
+
+        ttsbegin;
+
+        log.clear();
+        log.RequestId = _request.parmRequestId();
+        log.RequestTimestamp = _request.parmRequestTimestamp();
+        log.AccountCount = _request.getAccountCount();
+        log.Success = _success;
+        
+        if (_response)
+        {
+            log.TransactionId = _response.parmTransactionId();
+            log.Status = _response.parmStatus();
+            log.ProcessedRecords = _response.parmProcessedRecords();
+            log.FailedRecords = _response.parmFailedRecords();
+            log.ErrorMessage = _response.parmErrorMessage();
+        }
+
+        log.insert();
+
+        ttscommit;
+    }
+
+    /// &lt;summary&gt;
+    /// Adds authentication headers based on configured auth type
+    /// &lt;/summary&gt;
+    /// &lt;param name="_httpRequest"&gt;HTTP request object&lt;/param&gt;
+    private void addAuthenticationHeaders(System.Net.HttpWebRequest _httpRequest)
+    {
+        switch (this.authType)
+        {
+            case 'ApiKey':
+                if (this.apiKey)
+                {
+                    _httpRequest.Headers.Add(ApiKeyHeaderName, this.apiKey);
+                }
+                break;
+                
+            case 'Bearer':
+                if (this.bearerToken)
+                {
+                    _httpRequest.Headers.Add(AuthHeaderName, strFmt('Bearer %1', this.bearerToken));
+                }
+                break;
+                
+            case 'Basic':
+                if (this.basicAuthUsername && this.basicAuthPassword)
+                {
+                    str credentials = strFmt('%1:%2', this.basicAuthUsername, this.basicAuthPassword);
+                    str encodedCredentials = System.Convert::ToBase64String(
+                        System.Text.Encoding::UTF8.GetBytes(credentials)
+                    );
+                    _httpRequest.Headers.Add(AuthHeaderName, strFmt('Basic %1', encodedCredentials));
+                }
+                break;
+                
+            case AuthTypeNone:
+            default:
+                // No authentication
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Determines whether response body is a sign-in page instead of API payload
+    /// </summary>
+    /// <param name="_responseBody">Raw response body</param>
+    /// <returns>True if authentication page is detected</returns>
+    private boolean isAuthenticationPage(str _responseBody)
+    {
+        str lowerBody;
+
+        if (!_responseBody)
+        {
+            return false;
+        }
+
+        lowerBody = strLwr(_responseBody);
+
+        return (strScan(lowerBody, 'sign in to your account', 1, strLen(lowerBody)) > 0 ||
+                strScan(lowerBody, 'login.microsoftonline.com', 1, strLen(lowerBody)) > 0 ||
+                strScan(lowerBody, 'login.windows.net', 1, strLen(lowerBody)) > 0);
+    }
+
+    /// &lt;summary&gt;
+    /// Adds custom headers to the request
+    /// &lt;/summary&gt;
+    /// &lt;param name="_httpRequest"&gt;HTTP request object&lt;/param&gt;
+    private void addCustomHeaders(System.Net.HttpWebRequest _httpRequest)
+    {
+        MapIterator iterator;
+        
+        if (this.customHeaders && this.customHeaders.elements() > 0)
+        {
+            iterator = new MapIterator(this.customHeaders);
+            
+            while (iterator.more())
+            {
+                _httpRequest.Headers.Add(iterator.key(), iterator.value());
+                iterator.next();
+            }
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Adds a custom header to the request
+    /// &lt;/summary&gt;
+    /// &lt;param name="_headerName"&gt;Header name&lt;/param&gt;
+    /// &lt;param name="_headerValue"&gt;Header value&lt;/param&gt;
+    public void addCustomHeader(str _headerName, str _headerValue)
+    {
+        if (!this.customHeaders)
+        {
+            this.customHeaders = new Map(Types::String, Types::String);
+        }
+        this.customHeaders.insert(_headerName, _headerValue);
+    }
+
+    /// &lt;summary&gt;
+    /// Clears all custom headers
+    /// &lt;/summary&gt;
+    public void clearCustomHeaders()
+    {
+        this.customHeaders = new Map(Types::String, Types::String);
+    }
+
+    /// &lt;summary&gt;
+    /// Tests API connectivity
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;True if connection successful&lt;/returns&gt;
+    public boolean testConnection()
+    {
+        System.Net.HttpWebRequest httpRequest;
+        System.Net.HttpWebResponse httpResponse;
+        System.IO.StreamReader streamReader;
+        str responseBody;
+
+        try
+        {
+            httpRequest = System.Net.WebRequest::CreateHttp(this.apiEndpoint);
+            httpRequest.Method = 'GET';
+            httpRequest.Timeout = 5000; // 5 second timeout for test
+            httpRequest.AllowAutoRedirect = false;
+
+            this.addAuthenticationHeaders(httpRequest);
+            this.addCustomHeaders(httpRequest);
+
+            httpResponse = httpRequest.GetResponse();
+            
+            if (httpResponse.StatusCode == System.Net.HttpStatusCode::OK)
+            {
+                streamReader = new System.IO.StreamReader(httpResponse.GetResponseStream());
+                responseBody = streamReader.ReadToEnd();
+                streamReader.Close();
+
+                if (this.isAuthenticationPage(responseBody))
+                {
+                    warning("Endpoint is reachable but returned sign-in page (authentication required for API access)");
+                    return true;
+                }
+
+                info("API connection successful");
+                return true;
+            }
+
+            if (httpResponse.StatusCode == System.Net.HttpStatusCode::Found ||
+                httpResponse.StatusCode == System.Net.HttpStatusCode::Redirect)
+            {
+                warning("Endpoint is reachable but redirected (likely authentication required)");
+                return true;
+            }
+        }
+        catch
+        {
+            error("API connection failed");
+            return false;
+        }
+        finally
+        {
+            if (httpResponse)
+            {
+                httpResponse.Close();
+            }
+            if (streamReader)
+            {
+                streamReader.Dispose();
+            }
+        }
+
+        return false;
+    }
+
+    /// &lt;summary&gt;
+    /// Sets custom API endpoint (for testing)
+    /// &lt;/summary&gt;
+    /// &lt;param name="_endpoint"&gt;API endpoint URL&lt;/param&gt;
+    public void setAPIEndpoint(str _endpoint)
+    {
+        this.apiEndpoint = _endpoint;
+    }
+
+    /// &lt;summary&gt;
+    /// Sets custom API key (for testing)
+    /// &lt;/summary&gt;
+    /// &lt;param name="_apiKey"&gt;API key&lt;/param&gt;
+    public void setAPIKey(str _apiKey)
+    {
+        this.apiKey = _apiKey;
+        this.authType = 'ApiKey';
+    }
+
+    /// &lt;summary&gt;
+    /// Sets bearer token authentication
+    /// &lt;/summary&gt;
+    /// &lt;param name="_bearerToken"&gt;Bearer token&lt;/param&gt;
+    public void setBearerToken(str _bearerToken)
+    {
+        this.bearerToken = _bearerToken;
+        this.authType = 'Bearer';
+    }
+
+    /// &lt;summary&gt;
+    /// Sets basic authentication credentials
+    /// &lt;/summary&gt;
+    /// &lt;param name="_username"&gt;Username&lt;/param&gt;
+    /// &lt;param name="_password"&gt;Password&lt;/param&gt;
+    public void setBasicAuth(str _username, str _password)
+    {
+        this.basicAuthUsername = _username;
+        this.basicAuthPassword = _password;
+        this.authType = 'Basic';
+    }
+
+    /// &lt;summary&gt;
+    /// Sets HTTP method for requests
+    /// &lt;/summary&gt;
+    /// &lt;param name="_method"&gt;HTTP method (GET, POST, PUT, DELETE, PATCH)&lt;/param&gt;
+    public void setHTTPMethod(str _method)
+    {
+        this.httpMethod = _method;
+    }
+
+    /// &lt;summary&gt;
+    /// Sets content type for requests
+    /// &lt;/summary&gt;
+    /// &lt;param name="_contentType"&gt;Content type&lt;/param&gt;
+    public void setContentType(str _contentType)
+    {
+        this.contentType = _contentType;
+    }
+
+    /// &lt;summary&gt;
+    /// Sets authentication type
+    /// &lt;/summary&gt;
+    /// &lt;param name="_authType"&gt;Auth type: 'ApiKey', 'Bearer', 'Basic', 'None'&lt;/param&gt;
+    public void setAuthType(str _authType)
+    {
+        this.authType = _authType ? _authType : AuthTypeNone;
+    }
+}

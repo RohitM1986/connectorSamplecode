@@ -1,0 +1,215 @@
+/// <summary>
+/// Event handler that reacts to customer name changes and updates the name
+/// using a value retrieved from a third-party API endpoint.
+/// </summary>
+public class CRMCustomerNameChangeHandler
+{
+    private static boolean suppressHandler;
+    private const str DefaultAPIEndpoint = 'https://api.example.com/v1/sync';
+
+    [DataEventHandler(tableStr(DirPartyTable), DataEventType::Inserted)]
+    public static void DirPartyTable_onInserted(Common _sender, DataEventArgs _e)
+    {
+        // Disabled: when AgenticSyncEnabled is set, the Agentic AI Solution
+        // detects inserts via its polling loop and calls the external API in batches.
+        if (CRMIntegrationParameters::find().AgenticSyncEnabled == NoYes::Yes)
+        {
+            return;
+        }
+
+        CRMCustomerNameChangeHandler::handleDirPartyChange(_sender, true);
+    }
+
+    [DataEventHandler(tableStr(DirPartyTable), DataEventType::Updated)]
+    public static void DirPartyTable_onUpdated(Common _sender, DataEventArgs _e)
+    {
+        // Disabled: when AgenticSyncEnabled is set, the Agentic AI Solution
+        // detects updates (including name changes) via its polling loop.
+        if (CRMIntegrationParameters::find().AgenticSyncEnabled == NoYes::Yes)
+        {
+            return;
+        }
+
+        CRMCustomerNameChangeHandler::handleDirPartyChange(_sender, false);
+    }
+
+    private static void handleDirPartyChange(Common _sender, boolean _isInsert)
+    {
+        DirPartyTable dirPartyTable = _sender as DirPartyTable;
+        DirPartyTable originalDirParty;
+        CustTable custTable;
+        str resolvedName;
+        RecId targetPartyRecId;
+
+        if (!dirPartyTable)
+        {
+            return;
+        }
+
+        if (CRMCustomerNameChangeHandler::suppressHandler)
+        {
+            return;
+        }
+
+        targetPartyRecId = dirPartyTable.RecId;
+
+        if (!_isInsert)
+        {
+            originalDirParty = dirPartyTable.orig();
+            if (!originalDirParty)
+            {
+                return;
+            }
+
+            if (originalDirParty.Name == dirPartyTable.Name)
+            {
+                return;
+            }
+        }
+
+        select firstonly RecId, AccountNum
+            from custTable
+            where custTable.Party == dirPartyTable.RecId;
+
+        if (!custTable)
+        {
+            return;
+        }
+
+        resolvedName = CRMCustomerNameChangeHandler::resolveReplacementName();
+        if (!resolvedName || resolvedName == dirPartyTable.Name)
+        {
+            return;
+        }
+
+        CRMCustomerNameChangeHandler::suppressHandler = true;
+
+        try
+        {
+            ttsbegin;
+            select firstonly forupdate dirPartyTable
+                where dirPartyTable.RecId == targetPartyRecId;
+
+            if (dirPartyTable)
+            {
+                dirPartyTable.Name = resolvedName;
+                dirPartyTable.update();
+            }
+            ttscommit;
+        }
+        finally
+        {
+            CRMCustomerNameChangeHandler::suppressHandler = false;
+        }
+    }
+
+    private static str resolveReplacementName()
+    {
+        CRMIntegrationParameters parameters = CRMIntegrationParameters::find();
+        str endpoint = parameters.APIEndpoint ? parameters.APIEndpoint : DefaultAPIEndpoint;
+        str responseBody;
+        str apiName;
+        str apiValue;
+        str apiId;
+
+        responseBody = CRMCustomerNameChangeHandler::invokeGet(endpoint);
+
+        apiName = CRMCustomerNameChangeHandler::extractJsonValue(responseBody, 'name');
+        if (apiName)
+        {
+            return apiName;
+        }
+
+        apiValue = CRMCustomerNameChangeHandler::extractJsonValue(responseBody, 'value');
+        if (apiValue)
+        {
+            return apiValue;
+        }
+
+        apiId = CRMCustomerNameChangeHandler::extractJsonValue(responseBody, 'id');
+        if (apiId)
+        {
+            return apiId;
+        }
+
+        return '';
+    }
+
+    private static str invokeGet(str _url)
+    {
+        System.Net.HttpWebRequest httpRequest;
+        System.Net.HttpWebResponse httpResponse;
+        System.IO.StreamReader streamReader;
+        str responseBody;
+        InteropPermission interopPermission;
+
+        interopPermission = new InteropPermission(InteropKind::ClrInterop);
+        interopPermission.assert();
+
+        try
+        {
+            httpRequest = System.Net.WebRequest::CreateHttp(_url);
+            httpRequest.Method = 'GET';
+            httpRequest.ContentType = 'application/json';
+            httpRequest.Timeout = 30000;
+
+            httpResponse = httpRequest.GetResponse();
+            streamReader = new System.IO.StreamReader(httpResponse.GetResponseStream());
+            responseBody = streamReader.ReadToEnd();
+            streamReader.Close();
+            httpResponse.Close();
+        }
+        catch (Exception::CLRError)
+        {
+            throw error(strFmt('Third-party API call failed: %1', CLRInterop::getLastException().ToString()));
+        }
+        finally
+        {
+            CodeAccessPermission::revertAssert();
+        }
+
+        return responseBody;
+    }
+
+    private static str extractJsonValue(str _jsonBody, str _key, str _section = '')
+    {
+        int sectionPos;
+        int keyPos;
+        int valueStart;
+        int valueEnd;
+        str keyToken;
+
+        if (!_jsonBody || !_key)
+        {
+            return '';
+        }
+
+        sectionPos = 1;
+        if (_section)
+        {
+            sectionPos = strScan(_jsonBody, strFmt('"%1"', _section), 1, strLen(_jsonBody));
+            if (!sectionPos)
+            {
+                return '';
+            }
+        }
+
+        keyToken = strFmt('"%1":"', _key);
+        keyPos = strScan(_jsonBody, keyToken, sectionPos, strLen(_jsonBody) - sectionPos + 1);
+
+        if (!keyPos)
+        {
+            return '';
+        }
+
+        valueStart = keyPos + strLen(keyToken);
+        valueEnd = strScan(_jsonBody, '"', valueStart, strLen(_jsonBody) - valueStart + 1);
+
+        if (!valueEnd || valueEnd <= valueStart)
+        {
+            return '';
+        }
+
+        return subStr(_jsonBody, valueStart, valueEnd - valueStart);
+    }
+}

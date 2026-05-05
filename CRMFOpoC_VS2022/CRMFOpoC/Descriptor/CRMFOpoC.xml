@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxModelInfo xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <AppliedUpdates xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays" />
+  <Customization>Allow</Customization>
+  <Description>CRM External API Integration Package for Dynamics 365 Finance &amp; Operations</Description>
+  <DisplayName>CRM F&amp;O PoC</DisplayName>
+  <Layer>ISV</Layer>
+  <Locked>false</Locked>
+  <Model>CRMFOpoC</Model>
+  <ModuleReferences xmlns:d2p1="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+    <d2p1:string>ApplicationCommon</d2p1:string>
+    <d2p1:string>ApplicationFoundation</d2p1:string>
+    <d2p1:string>ApplicationPlatform</d2p1:string>
+    <d2p1:string>ApplicationSuite</d2p1:string>
+    <d2p1:string>Directory</d2p1:string>
+  </ModuleReferences>
+  <Name>CRMFOpoC</Name>
+  <Publisher>VTX</Publisher>
+  <VersionBuildNumber>0</VersionBuildNumber>
+  <VersionMajor>1</VersionMajor>
+  <VersionMinor>0</VersionMinor>
+  <VersionRevision>0</VersionRevision>
+</AxModelInfo>

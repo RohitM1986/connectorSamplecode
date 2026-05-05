@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="Current">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
+    <ProjectType>Dynamics</ProjectType>
+    <Name>CRMFOpoC</Name>
+    <RootNamespace>CRMFOpoC</RootNamespace>
+    <AssemblyName>CRMFOpoC</AssemblyName>
+    <Description>CRM Integration Model for Finance &amp; Operations</Description>
+    <Company>VTX</Company>
+    <Version>1.0.0.0</Version>
+    <Publisher>VTX</Publisher>
+    <Layer>ISV</Layer>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <!--
+    The Dynamics targets file is installed with the D365 FO developer tools VS extension.
+    On a standard developer VM it lives at:
+      C:\Program Files (x86)\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VisualStudio\v17.0\Dynamics\
+    The $(VSToolsPath) variable is set automatically by Visual Studio.
+  -->
+  <Import Project="$(VSToolsPath)\Dynamics\Microsoft.Dynamics.Framework.Tools.Project.Extensibility.Targets"
+          Condition="Exists('$(VSToolsPath)\Dynamics\Microsoft.Dynamics.Framework.Tools.Project.Extensibility.Targets')" />
+</Project>

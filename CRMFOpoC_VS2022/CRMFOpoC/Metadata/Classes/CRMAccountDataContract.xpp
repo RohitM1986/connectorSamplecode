@@ -1,0 +1,79 @@
+/// &lt;summary&gt;
+/// Data contract for customer account data
+/// &lt;/summary&gt;
+[DataContractAttribute]
+public class CRMAccountDataContract
+{
+    private CustAccount accountNumber;
+    private Name accountName;
+    private Email email;
+    private Phone phone;
+    private CRMAccountAddressContract address;
+    private CustGroupId custGroup;
+    private str currency;
+    private str paymentTerms;
+    private boolean isActive;
+
+    [DataMemberAttribute('AccountNumber')]
+    public CustAccount parmAccountNumber(CustAccount _accountNumber = accountNumber)
+    {
+        accountNumber = _accountNumber;
+        return accountNumber;
+    }
+
+    [DataMemberAttribute('AccountName')]
+    public Name parmAccountName(Name _accountName = accountName)
+    {
+        accountName = _accountName;
+        return accountName;
+    }
+
+    [DataMemberAttribute('Email')]
+    public Email parmEmail(Email _email = email)
+    {
+        email = _email;
+        return email;
+    }
+
+    [DataMemberAttribute('Phone')]
+    public Phone parmPhone(Phone _phone = phone)
+    {
+        phone = _phone;
+        return phone;
+    }
+
+    [DataMemberAttribute('Address')]
+    public CRMAccountAddressContract parmAddress(CRMAccountAddressContract _address = address)
+    {
+        address = _address;
+        return address;
+    }
+
+    [DataMemberAttribute('CustomerGroup')]
+    public CustGroupId parmCustGroup(CustGroupId _custGroup = custGroup)
+    {
+        custGroup = _custGroup;
+        return custGroup;
+    }
+
+    [DataMemberAttribute('Currency')]
+    public str parmCurrency(str _currency = currency)
+    {
+        currency = _currency;
+        return currency;
+    }
+
+    [DataMemberAttribute('PaymentTerms')]
+    public str parmPaymentTerms(str _paymentTerms = paymentTerms)
+    {
+        paymentTerms = _paymentTerms;
+        return paymentTerms;
+    }
+
+    [DataMemberAttribute('IsActive')]
+    public boolean parmIsActive(boolean _isActive = isActive)
+    {
+        isActive = _isActive;
+        return isActive;
+    }
+}

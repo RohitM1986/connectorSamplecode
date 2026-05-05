@@ -1,0 +1,204 @@
+/// &lt;summary&gt;
+/// Service class for accessing and managing customer account data
+/// &lt;/summary&gt;
+public class CRMAccountDataService
+{
+    private const int DefaultBatchSize = 100;
+
+    /// &lt;summary&gt;
+    /// Retrieves customer accounts based on filter criteria
+    /// &lt;/summary&gt;
+    /// &lt;param name="_fromDate"&gt;Start date for filtering&lt;/param&gt;
+    /// &lt;param name="_toDate"&gt;End date for filtering&lt;/param&gt;
+    /// &lt;param name="_custGroup"&gt;Customer group filter (optional)&lt;/param&gt;
+    /// &lt;returns&gt;List of account data contracts&lt;/returns&gt;
+    public List getAccounts(TransDate _fromDate = dateNull(), 
+                           TransDate _toDate = dateNull(),
+                           CustGroupId _custGroup = '')
+    {
+        List accountList = new List(Types::Class);
+        CustTable custTable;
+        DirPartyTable dirPartyTable;
+        LogisticsPostalAddress postalAddress;
+        LogisticsElectronicAddress emailAddress, phoneAddress;
+
+        // Build query
+        while select custTable
+            join dirPartyTable
+                where dirPartyTable.RecId == custTable.Party
+            outer join postalAddress
+                where postalAddress.Location == dirPartyTable.PrimaryAddressLocation
+                   && postalAddress.IsPrimary == NoYes::Yes
+            outer join emailAddress
+                where emailAddress.Location == dirPartyTable.PrimaryContactEmail
+                   && emailAddress.Type == LogisticsElectronicAddressMethodType::Email
+            outer join phoneAddress
+                where phoneAddress.Location == dirPartyTable.PrimaryContactPhone
+                   && phoneAddress.Type == LogisticsElectronicAddressMethodType::Phone
+        {
+            // Apply filters
+            if (_fromDate != dateNull() && custTable.createdDateTime < DateTimeUtil::newDateTime(_fromDate, 0))
+            {
+                continue;
+            }
+
+            if (_toDate != dateNull() && custTable.createdDateTime > DateTimeUtil::newDateTime(_toDate, 235959))
+            {
+                continue;
+            }
+
+            if (_custGroup && custTable.CustGroup != _custGroup)
+            {
+                continue;
+            }
+
+            // Map to contract
+            CRMAccountDataContract accountContract = this.mapCustTableToContract(
+                custTable, 
+                dirPartyTable, 
+                postalAddress, 
+                emailAddress, 
+                phoneAddress
+            );
+
+            accountList.addEnd(accountContract);
+        }
+
+        return accountList;
+    }
+
+    /// &lt;summary&gt;
+    /// Retrieves a single customer account by account number
+    /// &lt;/summary&gt;
+    /// &lt;param name="_accountNum"&gt;Customer account number&lt;/param&gt;
+    /// &lt;returns&gt;Account data contract&lt;/returns&gt;
+    public CRMAccountDataContract getAccountByNumber(CustAccount _accountNum)
+    {
+        CustTable custTable;
+        DirPartyTable dirPartyTable;
+        LogisticsPostalAddress postalAddress;
+        LogisticsElectronicAddress emailAddress, phoneAddress;
+
+        select firstonly custTable
+            where custTable.AccountNum == _accountNum
+            join dirPartyTable
+                where dirPartyTable.RecId == custTable.Party
+            outer join postalAddress
+                where postalAddress.Location == dirPartyTable.PrimaryAddressLocation
+                   && postalAddress.IsPrimary == NoYes::Yes
+            outer join emailAddress
+                where emailAddress.Location == dirPartyTable.PrimaryContactEmail
+                   && emailAddress.Type == LogisticsElectronicAddressMethodType::Email
+            outer join phoneAddress
+                where phoneAddress.Location == dirPartyTable.PrimaryContactPhone
+                   && phoneAddress.Type == LogisticsElectronicAddressMethodType::Phone;
+
+        if (!custTable)
+        {
+            throw error(strFmt("Customer account %1 not found", _accountNum));
+        }
+
+        return this.mapCustTableToContract(
+            custTable, 
+            dirPartyTable, 
+            postalAddress, 
+            emailAddress, 
+            phoneAddress
+        );
+    }
+
+    /// &lt;summary&gt;
+    /// Maps CustTable and related records to data contract
+    /// &lt;/summary&gt;
+    private CRMAccountDataContract mapCustTableToContract(
+        CustTable _custTable,
+        DirPartyTable _dirPartyTable,
+        LogisticsPostalAddress _postalAddress,
+        LogisticsElectronicAddress _emailAddress,
+        LogisticsElectronicAddress _phoneAddress)
+    {
+        CRMAccountDataContract contract = new CRMAccountDataContract();
+        CRMAccountAddressContract addressContract = new CRMAccountAddressContract();
+
+        // Map basic fields
+        contract.parmAccountNumber(_custTable.AccountNum);
+        contract.parmAccountName(_dirPartyTable.Name);
+        contract.parmCustGroup(_custTable.CustGroup);
+        contract.parmCurrency(_custTable.Currency);
+        contract.parmPaymentTerms(_custTable.PaymTermId);
+        contract.parmIsActive(_custTable.Blocked == CustVendorBlocked::No);
+
+        // Map email
+        if (_emailAddress)
+        {
+            contract.parmEmail(_emailAddress.Locator);
+        }
+
+        // Map phone
+        if (_phoneAddress)
+        {
+            contract.parmPhone(_phoneAddress.Locator);
+        }
+
+        // Map address
+        if (_postalAddress)
+        {
+            addressContract.parmStreet(_postalAddress.Street);
+            addressContract.parmCity(_postalAddress.City);
+            addressContract.parmState(_postalAddress.State);
+            addressContract.parmZipCode(_postalAddress.ZipCode);
+            addressContract.parmCountryRegionId(_postalAddress.CountryRegionId);
+            contract.parmAddress(addressContract);
+        }
+
+        return contract;
+    }
+
+    /// &lt;summary&gt;
+    /// Retrieves accounts in batches for processing
+    /// &lt;/summary&gt;
+    /// &lt;param name="_batchSize"&gt;Number of records per batch&lt;/param&gt;
+    /// &lt;param name="_custGroup"&gt;Customer group filter&lt;/param&gt;
+    /// &lt;returns&gt;Container with batch of accounts&lt;/returns&gt;
+    public container getAccountBatch(int _batchSize = DefaultBatchSize, CustGroupId _custGroup = '')
+    {
+        List accountList = new List(Types::Class);
+        int counter = 0;
+
+        List allAccounts = this.getAccounts(dateNull(), dateNull(), _custGroup);
+        ListIterator iterator = new ListIterator(allAccounts);
+
+        while (iterator.more() && counter < _batchSize)
+        {
+            accountList.addEnd(iterator.value());
+            iterator.next();
+            counter++;
+        }
+
+        return [accountList, iterator.more()];
+    }
+
+    /// &lt;summary&gt;
+    /// Gets the total count of customer accounts
+    /// &lt;/summary&gt;
+    /// &lt;param name="_custGroup"&gt;Customer group filter&lt;/param&gt;
+    /// &lt;returns&gt;Total count&lt;/returns&gt;
+    public int getAccountCount(CustGroupId _custGroup = '')
+    {
+        CustTable custTable;
+        int count;
+
+        if (_custGroup)
+        {
+            select count(RecId) from custTable
+                where custTable.CustGroup == _custGroup;
+        }
+        else
+        {
+            select count(RecId) from custTable;
+        }
+
+        count = custTable.RecId;
+        return count;
+    }
+}

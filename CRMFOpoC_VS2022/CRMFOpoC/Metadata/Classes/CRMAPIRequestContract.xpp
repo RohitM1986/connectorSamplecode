@@ -1,0 +1,69 @@
+/// &lt;summary&gt;
+/// Data contract for API request payload
+/// &lt;/summary&gt;
+[DataContractAttribute]
+public class CRMAPIRequestContract
+{
+    private List accountList;
+    private str requestId;
+    private utcdatetime requestTimestamp;
+    private str requestType;
+
+    public void new()
+    {
+        super();
+        accountList = new List(Types::Class);
+        requestId = guid2Str(newGuid());
+        requestTimestamp = DateTimeUtil::utcNow();
+    }
+
+    [DataMemberAttribute('RequestId')]
+    public str parmRequestId(str _requestId = requestId)
+    {
+        requestId = _requestId;
+        return requestId;
+    }
+
+    [DataMemberAttribute('RequestTimestamp')]
+    public utcdatetime parmRequestTimestamp(utcdatetime _requestTimestamp = requestTimestamp)
+    {
+        requestTimestamp = _requestTimestamp;
+        return requestTimestamp;
+    }
+
+    [DataMemberAttribute('RequestType')]
+    public str parmRequestType(str _requestType = requestType)
+    {
+        requestType = _requestType;
+        return requestType;
+    }
+
+    [DataMemberAttribute('Accounts')]
+    public List parmAccountList(List _accountList = accountList)
+    {
+        accountList = _accountList;
+        return accountList;
+    }
+
+    /// &lt;summary&gt;
+    /// Adds account data to the request
+    /// &lt;/summary&gt;
+    /// &lt;param name="_account"&gt;Account data contract&lt;/param&gt;
+    public void addAccount(CRMAccountDataContract _account)
+    {
+        if (accountList == null)
+        {
+            accountList = new List(Types::Class);
+        }
+        accountList.addEnd(_account);
+    }
+
+    /// &lt;summary&gt;
+    /// Gets the number of accounts in the request
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;Number of accounts&lt;/returns&gt;
+    public int getAccountCount()
+    {
+        return accountList ? accountList.elements() : 0;
+    }
+}
